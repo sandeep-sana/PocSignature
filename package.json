@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "bootstrap": "^5.0.1",
     "nuxt": "^4.0.3",
     "signature_pad": "^5.0.10",
     "vee-validate": "^4.15.1",

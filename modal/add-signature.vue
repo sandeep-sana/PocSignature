@@ -1,92 +1,171 @@
+<!-- components/AddSignatureModal.vue -->
 <template>
-    <div class="modal-backdrop" v-if="show">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Add Signature</h2>
-                <button class="close-btn" @click="close()">✕</button>
+    <div class="sig-backdrop" v-if="show" aria-modal="true" role="dialog" aria-labelledby="sigModalTitle">
+        <div class="sig-modal card shadow-lg">
+            <!-- Header -->
+            <div class="card-header d-flex align-items-center justify-content-between bg-white">
+                <h2 id="sigModalTitle" class="h5 mb-0">Add Signature</h2>
+                <button type="button" class="btn-close" aria-label="Close" @click="close()"></button>
             </div>
-            <form @submit="save">
-                <div class="form-grid">
-                    <Field name="empId" type="text" placeholder="Employee Id" class="form-input"
-                        :class="{ error: errors.empId }" />
-                    <ErrorMessage name="empId" class="error-message" />
-                    <Field name="name" type="text" placeholder="name" class="form-input"
-                        :class="{ error: errors.name }" />
-                    <ErrorMessage name="name" class="error-message" />
-                    <Field name="dept" type="text" placeholder="dept" class="form-input"
-                        :class="{ error: errors.dept }" />
-                    <ErrorMessage name="dept" class="error-message" />
-                    <Field name="email" type="text" placeholder="email" class="form-input"
-                        :class="{ error: errors.email }" />
-                    <ErrorMessage name="email" class="error-message" />
-                    <label for="consent">I consent to store my specimen signature</label>
-                    <Field name="consent" type="checkbox" placeholder="consent" class="form-input"
-                        :class="{ error: errors.consent }" value="true" />
-                    <ErrorMessage name="consent" class="error-message" />
-                </div>
 
-                <div class="mode-switch">
-                    <button type="button" :class="['tab', mode === 'draw' && 'active']"
-                        @click="mode = 'draw'">Draw</button>
-                    <button type="button" :class="['tab', mode === 'upload' && 'active']"
-                        @click="mode = 'upload'">Upload</button>
-                </div>
+            <!-- Body -->
+            <div class="card-body">
+                <form @submit="save" novalidate>
+                    <!-- Basic Details -->
+                    <div class="container-fluid px-0">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="empId">Employee ID</label>
+                                <Field id="empId" name="empId" type="text" placeholder="Employee ID"
+                                    class="form-control" :class="{ 'is-invalid': errors.empId }" />
+                                <ErrorMessage name="empId" class="invalid-feedback d-block" />
+                            </div>
 
-                <ClientOnly v-if="mode === 'draw'">
-                    <div class="signature-section">
-                        <p>Draw Signature:</p>
-                        <div class="sig-wrap">
-                            <canvas ref="canvas" class="sig-canvas"></canvas>
+                            <div class="col-md-6">
+                                <label class="form-label" for="name">Name</label>
+                                <Field id="name" name="name" type="text" placeholder="Full name" class="form-control"
+                                    :class="{ 'is-invalid': errors.name }" />
+                                <ErrorMessage name="name" class="invalid-feedback d-block" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="dept">Department / Site</label>
+                                <Field id="dept" name="dept" type="text" placeholder="e.g. Finance / Chennai"
+                                    class="form-control" :class="{ 'is-invalid': errors.dept }" />
+                                <ErrorMessage name="dept" class="invalid-feedback d-block" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label" for="email">Email</label>
+                                <Field id="email" name="email" type="email" placeholder="name@company.com"
+                                    class="form-control" :class="{ 'is-invalid': errors.email }" autocomplete="email" />
+                                <ErrorMessage name="email" class="invalid-feedback d-block" />
+                            </div>
+
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <Field id="consent" name="consent" type="checkbox" class="form-check-input"
+                                        :class="{ 'is-invalid': errors.consent }" value="true" />
+                                    <label for="consent" class="form-check-label">
+                                        I consent to store my specimen signature
+                                    </label>
+                                </div>
+                                <ErrorMessage name="consent" class="invalid-feedback d-block" />
+                            </div>
                         </div>
-                        <div class="sig-actions">
-                            <button type="button" @click="clear">Clear</button>
+                    </div>
+
+                    <!-- Mode Switch -->
+                    <div class="d-flex flex-wrap align-items-center gap-2 my-4">
+                        <div class="btn-group sig-segment" role="group" aria-label="Signature mode switch">
+                            <button type="button" class="btn"
+                                :class="mode === 'draw' ? 'btn-primary' : 'btn-outline-primary'" @click="mode = 'draw'">
+                                Draw
+                            </button>
+                            <button type="button" class="btn"
+                                :class="mode === 'upload' ? 'btn-primary' : 'btn-outline-primary'"
+                                @click="mode = 'upload'">
+                                Upload
+                            </button>
+                        </div>
+                        <small class="text-muted">Choose how you want to provide your signature</small>
+                    </div>
+
+                    <!-- Draw Mode -->
+                    <ClientOnly v-if="mode === 'draw'">
+                        <div class="sig-section">
+                            <label class="form-label mb-2">Draw Signature</label>
+
+                            <div class="card border-1 sig-canvas-card">
+                                <div class="card-body p-2">
+                                    <div class="sig-canvas-wrap">
+                                        <canvas ref="canvas" class="sig-canvas w-100 h-100"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-secondary" @click="clear">
+                                    Clear
+                                </button>
+                                <small class="text-muted align-self-center">Use mouse or touch to draw</small>
+                            </div>
+                        </div>
+                    </ClientOnly>
+
+                    <!-- Upload Mode -->
+                    <div v-else class="sig-section">
+                        <label class="form-label mb-2">Upload Signature (PNG/JPEG)</label>
+
+                        <div class="input-group">
+                            <input type="file" class="form-control" accept="image/*" @change="onSignatureFile"
+                                aria-label="Upload signature image" />
+                        </div>
+
+                        <div v-if="signaturePreview" class="sig-preview mt-3">
+                            <div class="card sig-preview-card">
+                                <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                    <img :src="signaturePreview" alt="Signature preview" class="img-fluid" />
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </ClientOnly>
 
-                <div v-else class="signature-section">
-                    <p>Upload Signature (PNG/JPEG):</p>
-                    <input type="file" accept="image/*" @change="onSignatureFile" />
-                    <div v-if="signaturePreview" class="preview">
-                        <img :src="signaturePreview" alt="Signature preview" />
+                    <!-- Optional Photo -->
+                    <div class="sig-section mt-4">
+                        <label class="form-label mb-2">Upload Photo (optional)</label>
+
+                        <div class="input-group">
+                            <input type="file" class="form-control" accept="image/*" @change="onPhoto"
+                                aria-label="Upload photo" />
+                        </div>
+
+                        <div v-if="photoPreview" class="sig-preview mt-3">
+                            <div class="card sig-preview-card">
+                                <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                    <img :src="photoPreview" alt="Photo preview" class="img-fluid rounded" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="signature-section">
-                    <p>Upload Photo (optional):</p>
-                    <input type="file" @change="onPhoto" accept="image/*" />
-                    <div v-if="photoPreview" class="preview">
-                        <img :src="photoPreview" alt="Photo preview" />
+                    <!-- Versions -->
+                    <div v-if="versions.length" class="mt-4">
+                        <h3 class="h6 mb-2">Saved Versions</h3>
+                        <ul class="list-group small">
+                            <li v-for="(v, i) in versions" :key="i"
+                                class="list-group-item d-flex justify-content-between">
+                                <span>Version {{ v.version }}</span>
+                                <span class="text-muted">{{ v.timestamp }}</span>
+                            </li>
+                        </ul>
                     </div>
-                </div>
 
-                <div v-if="versions.length" class="versions">
-                    <h3>Saved Versions</h3>
-                    <ul>
-                        <li v-for="(v, i) in versions" :key="i">
-                            Version {{ v.version }} — {{ v.timestamp }}
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="actions">
-                    <button type="submit" class="primary">Save</button>
-                    <button type="button" @click="close()" class="secondary">Cancel</button>
-                </div>
-            </form>
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="submit" class="btn btn-success px-4">
+                            Save
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @click="close()">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <!-- /Body -->
         </div>
     </div>
 </template>
 
 <script setup>
 import * as yup from "yup";
-import SignaturePad from 'signature_pad';
-import VEE_VALIDATION_MESSAGE from '../validation-message';
+import SignaturePad from "signature_pad";
+import VEE_VALIDATION_MESSAGE from "../validation-message";
 import { Field, ErrorMessage, useForm } from "vee-validate";
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 
-const props = defineProps({ show: Boolean })
-const emit = defineEmits(['close', 'saved'])
+const props = defineProps({ show: Boolean });
+const emit = defineEmits(["close", "saved"]);
 
 const { handleSubmit, errors } = useForm({
     validationSchema: yup.object({
@@ -100,309 +179,222 @@ const { handleSubmit, errors } = useForm({
             .trim()
             .required(VEE_VALIDATION_MESSAGE.NAME_REQUIRED)
             .max(50, VEE_VALIDATION_MESSAGE.NAME_MAX_50),
-
         email: yup
             .string()
             .trim()
             .required(VEE_VALIDATION_MESSAGE.EMAIL_REQUIRED)
             .email(VEE_VALIDATION_MESSAGE.EMAIL_INVALID)
             .max(100, VEE_VALIDATION_MESSAGE.EMAIL_MAX_100),
-
-        dept: yup
-            .string()
-            .required(VEE_VALIDATION_MESSAGE.DEPT_REQUIRED),
-
-        consent: yup
-            .string()
-            .required(VEE_VALIDATION_MESSAGE.CONSENT_REQUIRED),
+        dept: yup.string().required(VEE_VALIDATION_MESSAGE.DEPT_REQUIRED),
+        consent: yup.string().required(VEE_VALIDATION_MESSAGE.CONSENT_REQUIRED),
     }),
     initialValues: {
-        empId: '',
-        name: '',
-        dept: '',
-        email: '',
-        consent: '',
+        empId: "",
+        name: "",
+        dept: "",
+        email: "",
+        consent: "",
     },
 });
 
-
-const save = handleSubmit (async (values) => {
-
-})
-
+const save = handleSubmit(async (values) => {
+    // You can emit or call your API here. Kept minimal as per your original code.
+    // Example emit (uncomment & adapt when you integrate):
+    // let signatureDataUrl = null;
+    // if (mode.value === 'draw') {
+    //   if (!pad || pad.isEmpty()) return alert('Please draw a signature before saving.');
+    //   signatureDataUrl = pad.toDataURL('image/png');
+    // } else {
+    //   if (!signatureFile.value) return alert('Please choose a signature image file.');
+    //   signatureDataUrl = await fileToDataURL(signatureFile.value);
+    // }
+    // versions.value.push({ version: versions.value.length + 1, timestamp: new Date().toLocaleString() });
+    // emit('saved', { ...values, signatureDataUrl, photoFile: photoFile.value || null });
+});
 
 /* ---------- Modes: draw or upload ---------- */
-const mode = ref('draw') // 'draw' | 'upload'
+const mode = ref("draw"); // 'draw' | 'upload'
 
 /* ---------- Signature Pad ---------- */
-const canvas = ref(null)
-let pad = null
+const canvas = ref(null);
+let pad = null;
 
 function setupCanvas() {
-    if (!canvas.value) return
-    const c = canvas.value
-    // Use CSS size as layout size
-    const rect = c.getBoundingClientRect()
-    const dpr = window.devicePixelRatio || 1
-    c.width = Math.max(1, Math.floor(rect.width * dpr))
-    c.height = Math.max(1, Math.floor(rect.height * dpr))
-    const ctx = c.getContext('2d')
-    ctx.scale(dpr, dpr)
-    // (Re)init pad
-    pad = new SignaturePad(c, { minWidth: 0.7, maxWidth: 2.2, backgroundColor: '#fff' })
+    if (!canvas.value) return;
+    const c = canvas.value;
+    // layout size from CSS
+    const rect = c.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    c.width = Math.max(1, Math.floor(rect.width * dpr));
+    c.height = Math.max(1, Math.floor(rect.height * dpr));
+    const ctx = c.getContext("2d");
+    ctx.scale(dpr, dpr);
+    pad = new SignaturePad(c, { minWidth: 0.7, maxWidth: 2.2, backgroundColor: "#fff" });
 }
 
 function clear() {
-    pad?.clear()
+    pad?.clear();
 }
 
 function handleResize() {
-    // keep drawn content? For simplicity, clear on resize
-    const data = pad && !pad.isEmpty() ? pad.toDataURL('image/png') : null
-    setupCanvas()
+    const data = pad && !pad.isEmpty() ? pad.toDataURL("image/png") : null;
+    setupCanvas();
     if (data && pad) {
-        // redraw saved image
-        const img = new Image()
+        const img = new Image();
         img.onload = () => {
-            const ctx = canvas.value.getContext('2d')
-            ctx.drawImage(img, 0, 0, canvas.value.width / (window.devicePixelRatio || 1), canvas.value.height / (window.devicePixelRatio || 1))
-        }
-        img.src = data
+            const ctx = canvas.value.getContext("2d");
+            const scale = 1 / (window.devicePixelRatio || 1);
+            ctx.drawImage(img, 0, 0, canvas.value.width * scale, canvas.value.height * scale);
+        };
+        img.src = data;
     }
 }
 
 onMounted(async () => {
-    if (mode.value === 'draw' && props.show) {
-        await nextTick()
-        setupCanvas()
-        window.addEventListener('resize', handleResize)
+    if (mode.value === "draw" && props.show) {
+        await nextTick();
+        setupCanvas();
+        window.addEventListener("resize", handleResize);
     }
-})
+});
+
 onBeforeUnmount(() => {
-    window.removeEventListener('resize', handleResize)
-})
+    window.removeEventListener("resize", handleResize);
+});
 
 // Re-init when modal opens or when switching to draw mode
-watch(() => props.show, async (v) => {
-    if (v && mode.value === 'draw') {
-        await nextTick()
-        setupCanvas()
+watch(
+    () => props.show,
+    async (v) => {
+        if (v && mode.value === "draw") {
+            await nextTick();
+            setupCanvas();
+        }
     }
-})
+);
 watch(mode, async (m) => {
-    if (props.show && m === 'draw') {
-        await nextTick()
-        setupCanvas()
+    if (props.show && m === "draw") {
+        await nextTick();
+        setupCanvas();
     }
-})
+});
 
 /* ---------- Uploads & previews ---------- */
-const signatureFile = ref(null)
-const signaturePreview = ref(null)
+const signatureFile = ref(null);
+const signaturePreview = ref(null);
 function onSignatureFile(e) {
-    const f = e.target.files?.[0]
-    signatureFile.value = f || null
-    signaturePreview.value = f ? URL.createObjectURL(f) : null
+    const f = e.target.files?.[0];
+    signatureFile.value = f || null;
+    signaturePreview.value = f ? URL.createObjectURL(f) : null;
 }
 
-const photoFile = ref(null)
-const photoPreview = ref(null)
+const photoFile = ref(null);
+const photoPreview = ref(null);
 function onPhoto(e) {
-    const f = e.target.files?.[0]
-    photoFile.value = f || null
-    photoPreview.value = f ? URL.createObjectURL(f) : null
+    const f = e.target.files?.[0];
+    photoFile.value = f || null;
+    photoPreview.value = f ? URL.createObjectURL(f) : null;
 }
 
-/* ---------- Save ---------- */
-const versions = ref([])
+/* ---------- Fake versions list (keep your original if needed) ---------- */
+const versions = ref([]);
 
 function close() {
-    emit('close')
+    emit("close");
 }
-
-// async function save() {
-//     let signatureDataUrl = null
-
-//     if (mode.value === 'draw') {
-//         if (!pad || pad.isEmpty()) {
-//             alert('Please draw a signature before saving.')
-//             return
-//         }
-//         signatureDataUrl = pad.toDataURL('image/png')
-//     } else {
-//         if (!signatureFile.value) {
-//             alert('Please choose a signature image file.')
-//             return
-//         }
-//         // Convert file to dataURL
-//         signatureDataUrl = await fileToDataURL(signatureFile.value)
-//     }
-
-//     // Fake save: push version
-//     versions.value.push({
-//         version: versions.value.length + 1,
-//         timestamp: new Date().toLocaleString()
-//     })
-
-//     // Emit saved payload to parent (you can post to your API here)
-//     emit('saved', {
-//         ...form.value,
-//         signatureDataUrl,
-//         photoFile: photoFile.value || null
-//     })
-
-//     alert('Signature saved!')
-//     close()
-// }
 
 function fileToDataURL(file) {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result)
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-    })
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 </script>
 
 <style scoped>
-.modal-backdrop {
+/* Backdrop */
+.sig-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    z-index: 1055;
+    /* above BS navbar/modals if any */
+    background: rgba(18, 20, 31, 0.55);
     display: grid;
     place-items: center;
-    z-index: 50;
+    padding: 1rem;
 }
 
-.modal {
-    background: #fff;
-    width: 640px;
-    max-width: 95%;
-    border-radius: 8px;
+/* Modal container (card) */
+.sig-modal {
+    width: 760px;
+    max-width: 100%;
+    border-radius: 0.75rem;
     overflow: hidden;
-    padding: 1.25rem 1.5rem 1.5rem;
+    border: 0;
+    height: calc(80vh);
+    overflow-y: auto;
 }
 
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: .75rem;
+
+/* Segment group look refinement */
+.sig-segment .btn {
+    min-width: 96px;
 }
 
-.close-btn {
-    background: transparent;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
+/* Signature canvas card */
+.sig-canvas-card {
+    border-color: #e5e7eb;
 }
 
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-}
-
-.form-grid label {
-    display: flex;
-    flex-direction: column;
-    font-size: 0.9rem;
-}
-
-.consent {
-    grid-column: span 2;
-}
-
-.mode-switch {
-    display: flex;
-    gap: 6px;
-    margin-top: 1rem;
-}
-
-.tab {
-    border: 1px solid #e5e7eb;
-    background: #f8fafc;
-    padding: .375rem .75rem;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.tab.active {
-    background: #e0f7ec;
-    border-color: #22c55e;
-}
-
-.signature-section {
-    margin-top: 1rem;
-}
-
-.sig-wrap {
+.sig-canvas-wrap {
     width: 100%;
-    height: 160px;
+    height: 180px;
 }
 
 .sig-canvas {
+    display: block;
     width: 100%;
     height: 100%;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    display: block;
     background: #fff;
+    border: 1px solid #dfe3ea;
+    border-radius: 0.375rem;
     touch-action: none;
     /* allow drawing on touch */
+
 }
 
-.sig-actions {
-    margin-top: 0.5rem;
+/* Preview cards */
+.sig-preview-card {
+    border-color: #e5e7eb;
 }
 
-.preview {
-    margin-top: .5rem;
+.sig-preview img {
+    max-height: 180px;
+    object-fit: contain;
 }
 
-.preview img {
-    max-height: 160px;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
+/* Optional brand tint (adjust to your palette) */
+:root {
+    --sig-primary: #3e436d;
+    /* matches your preferred blue/indigo */
 }
 
-.versions {
-    margin-top: 1rem;
+.btn-primary,
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+    border-color: var(--sig-primary);
+    background-color: var(--sig-primary);
 }
 
-.versions ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.btn-outline-primary {
+    color: var(--sig-primary);
+    border-color: var(--sig-primary);
+    background: transparent;
 }
 
-.versions li {
-    font-size: 0.85rem;
-    padding: 0.25rem 0;
-}
-
-.actions {
-    margin-top: 1.25rem;
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-}
-
-.primary {
-    background: #22c55e;
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.secondary {
-    background: #e5e7eb;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
+.card-header {
+    border-bottom: 1px solid #eef0f5;
 }
 </style>
