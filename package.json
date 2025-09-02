@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "bootstrap": "^5.0.1",
+    "axios": "^1.11.0",
     "nuxt": "^4.0.3",
     "signature_pad": "^5.0.10",
     "vee-validate": "^4.15.1",

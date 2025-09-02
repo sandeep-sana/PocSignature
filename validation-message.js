@@ -10,6 +10,7 @@ const VEE_VALIDATION_MESSAGE = {
     EMAIL_REQUIRED:  `Email ${COMMON.REQUIRED}`,
     DEPT_REQUIRED:  `Dept ${COMMON.REQUIRED}`,
     CONSENT_REQUIRED:  `Consent ${COMMON.REQUIRED}`,
+    SIGNATURE_REQUIRED:  `Signature ${COMMON.REQUIRED}`,
     
     EMPLOYEE_ID_MAX_50: `EmployeeId can exceed ${COMMON.MAX_50}`,
     NAME_MAX_50: `Name can exceed ${COMMON.MAX_50}`,

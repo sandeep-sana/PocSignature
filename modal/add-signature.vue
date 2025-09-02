@@ -111,23 +111,7 @@
                         </div>
                     </div>
 
-                    <!-- Optional Photo -->
-                    <div class="sig-section mt-4">
-                        <label class="form-label mb-2">Upload Photo (optional)</label>
-
-                        <div class="input-group">
-                            <input type="file" class="form-control" accept="image/*" @change="onPhoto"
-                                aria-label="Upload photo" />
-                        </div>
-
-                        <div v-if="photoPreview" class="sig-preview mt-3">
-                            <div class="card sig-preview-card">
-                                <div class="card-body d-flex align-items-center justify-content-center p-2">
-                                    <img :src="photoPreview" alt="Photo preview" class="img-fluid rounded" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                   
 
                     <!-- Versions -->
                     <div v-if="versions.length" class="mt-4">
@@ -159,58 +143,49 @@
 
 <script setup>
 import * as yup from "yup";
-import SignaturePad from "signature_pad";
-import VEE_VALIDATION_MESSAGE from "../validation-message";
+import VEE_VALIDATION_MESSAGE from '../validation-message';
 import { Field, ErrorMessage, useForm } from "vee-validate";
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import SignaturePad from "../common/signature-pad.vue";
+import api from "../api.config";
+import CONFIG from "../config";
 
 const props = defineProps({ show: Boolean });
 const emit = defineEmits(["close", "saved"]);
 
-const { handleSubmit, errors } = useForm({
+const { handleSubmit, errors, values, setValues } = useForm({
     validationSchema: yup.object({
-        empId: yup
-            .string()
-            .trim()
-            .required(VEE_VALIDATION_MESSAGE.EMPLOYEE_ID_REQUIRED)
-            .max(50, VEE_VALIDATION_MESSAGE.EMPLOYEE_ID_MAX_50),
-        name: yup
-            .string()
-            .trim()
-            .required(VEE_VALIDATION_MESSAGE.NAME_REQUIRED)
-            .max(50, VEE_VALIDATION_MESSAGE.NAME_MAX_50),
-        email: yup
-            .string()
-            .trim()
-            .required(VEE_VALIDATION_MESSAGE.EMAIL_REQUIRED)
-            .email(VEE_VALIDATION_MESSAGE.EMAIL_INVALID)
-            .max(100, VEE_VALIDATION_MESSAGE.EMAIL_MAX_100),
+        empId: yup.string().trim().required(VEE_VALIDATION_MESSAGE.EMPLOYEE_ID_REQUIRED).max(50, VEE_VALIDATION_MESSAGE.EMPLOYEE_ID_MAX_50),
+        name: yup.string().trim().required(VEE_VALIDATION_MESSAGE.NAME_REQUIRED).max(50, VEE_VALIDATION_MESSAGE.NAME_MAX_50),
+        email: yup.string().trim().required(VEE_VALIDATION_MESSAGE.EMAIL_REQUIRED).email(VEE_VALIDATION_MESSAGE.EMAIL_INVALID).max(100, VEE_VALIDATION_MESSAGE.EMAIL_MAX_100),
         dept: yup.string().required(VEE_VALIDATION_MESSAGE.DEPT_REQUIRED),
         consent: yup.string().required(VEE_VALIDATION_MESSAGE.CONSENT_REQUIRED),
+        signature: yup.mixed().required(VEE_VALIDATION_MESSAGE.SIGNATURE_REQUIRED),
     }),
     initialValues: {
-        empId: "",
-        name: "",
-        dept: "",
-        email: "",
-        consent: "",
+        empId: '',
+        name: '',
+        dept: '',
+        email: '',
+        consent: '',
+        signature: '', // will hold base64 (data URL) string
     },
 });
 
 const save = handleSubmit(async (values) => {
-    // You can emit or call your API here. Kept minimal as per your original code.
-    // Example emit (uncomment & adapt when you integrate):
-    // let signatureDataUrl = null;
-    // if (mode.value === 'draw') {
-    //   if (!pad || pad.isEmpty()) return alert('Please draw a signature before saving.');
-    //   signatureDataUrl = pad.toDataURL('image/png');
-    // } else {
-    //   if (!signatureFile.value) return alert('Please choose a signature image file.');
-    //   signatureDataUrl = await fileToDataURL(signatureFile.value);
-    // }
-    // versions.value.push({ version: versions.value.length + 1, timestamp: new Date().toLocaleString() });
-    // emit('saved', { ...values, signatureDataUrl, photoFile: photoFile.value || null });
-});
+    const response = await api.post(`${CONFIG.API}/api/employee/employee`, { ...values });
+    console.log('response', response);
+    close();
+
+})
+
+const signature = (signature) => {
+    // called by your SignaturePad component (already base64 data URL)
+    setValues({
+        ...values,
+        signature: signature.dataUrl,
+    })
+}
 
 /* ---------- Modes: draw or upload ---------- */
 const mode = ref("draw"); // 'draw' | 'upload'
@@ -220,16 +195,15 @@ const canvas = ref(null);
 let pad = null;
 
 function setupCanvas() {
-    if (!canvas.value) return;
-    const c = canvas.value;
-    // layout size from CSS
-    const rect = c.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    c.width = Math.max(1, Math.floor(rect.width * dpr));
-    c.height = Math.max(1, Math.floor(rect.height * dpr));
-    const ctx = c.getContext("2d");
-    ctx.scale(dpr, dpr);
-    pad = new SignaturePad(c, { minWidth: 0.7, maxWidth: 2.2, backgroundColor: "#fff" });
+    if (!canvas.value) return
+    const c = canvas.value
+    const rect = c.getBoundingClientRect()
+    const dpr = window.devicePixelRatio || 1
+    c.width = Math.max(1, Math.floor(rect.width * dpr))
+    c.height = Math.max(1, Math.floor(rect.height * dpr))
+    const ctx = c.getContext('2d')
+    ctx.scale(dpr, dpr)
+    pad = new SignaturePad(c, { minWidth: 0.7, maxWidth: 2.2, backgroundColor: '#fff' })
 }
 
 function clear() {
@@ -237,16 +211,21 @@ function clear() {
 }
 
 function handleResize() {
-    const data = pad && !pad.isEmpty() ? pad.toDataURL("image/png") : null;
-    setupCanvas();
+    const data = pad && !pad.isEmpty() ? pad.toDataURL('image/png') : null
+    setupCanvas()
     if (data && pad) {
-        const img = new Image();
+        const img = new Image()
         img.onload = () => {
-            const ctx = canvas.value.getContext("2d");
-            const scale = 1 / (window.devicePixelRatio || 1);
-            ctx.drawImage(img, 0, 0, canvas.value.width * scale, canvas.value.height * scale);
-        };
-        img.src = data;
+            const ctx = canvas.value.getContext('2d')
+            ctx.drawImage(
+                img,
+                0,
+                0,
+                canvas.value.width / (window.devicePixelRatio || 1),
+                canvas.value.height / (window.devicePixelRatio || 1)
+            )
+        }
+        img.src = data
     }
 }
 
@@ -262,16 +241,12 @@ onBeforeUnmount(() => {
     window.removeEventListener("resize", handleResize);
 });
 
-// Re-init when modal opens or when switching to draw mode
-watch(
-    () => props.show,
-    async (v) => {
-        if (v && mode.value === "draw") {
-            await nextTick();
-            setupCanvas();
-        }
+watch(() => props.show, async (v) => {
+    if (v && mode.value === 'draw') {
+        await nextTick()
+        setupCanvas()
     }
-);
+});
 watch(mode, async (m) => {
     if (props.show && m === "draw") {
         await nextTick();
@@ -279,21 +254,37 @@ watch(mode, async (m) => {
     }
 });
 
-/* ---------- Uploads & previews ---------- */
-const signatureFile = ref(null);
-const signaturePreview = ref(null);
-function onSignatureFile(e) {
-    const f = e.target.files?.[0];
-    signatureFile.value = f || null;
-    signaturePreview.value = f ? URL.createObjectURL(f) : null;
+/* ---------- Uploads & previews (as base64) ---------- */
+const signatureFile = ref(null)
+const signaturePreview = ref(null)
+
+async function onSignatureFile(e) {
+    const f = e.target.files?.[0] || null
+    signatureFile.value = f
+
+    if (!f) {
+        signaturePreview.value = null
+        setValues({ ...values, signature: '' })
+        return
+    }
+
+    // Convert file to base64 (data URL)
+    const dataUrl = await fileToDataURL(f)
+    // 1) show preview from base64
+    signaturePreview.value = dataUrl
+    // 2) store base64 into your vee-validate form value
+    setValues({
+        ...values,
+        signature: dataUrl,
+    })
 }
 
-const photoFile = ref(null);
-const photoPreview = ref(null);
-function onPhoto(e) {
-    const f = e.target.files?.[0];
-    photoFile.value = f || null;
-    photoPreview.value = f ? URL.createObjectURL(f) : null;
+const photoFile = ref(null)
+const photoPreview = ref(null)
+async function onPhoto(e) {
+    const f = e.target.files?.[0] || null
+    photoFile.value = f
+    photoPreview.value = f ? await fileToDataURL(f) : null
 }
 
 /* ---------- Fake versions list (keep your original if needed) ---------- */
@@ -303,15 +294,17 @@ function close() {
     emit("close");
 }
 
+/* ---------- Helpers ---------- */
 function fileToDataURL(file) {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result) // data URL (base64)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+    })
 }
 </script>
+
 
 <style scoped>
 /* Backdrop */

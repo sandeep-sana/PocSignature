@@ -8,18 +8,17 @@
     <table class="emp-table">
       <thead>
         <tr>
-          <th>#</th><th>Name</th><th>Email</th><th>Signature</th><th>Action</th>
+          <th>#</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>1</td><td>Rahul</td><td>rahul@example.com</td>
-          <td><!-- <img src="/placeholder-signature.png" alt="Signature" /> --></td>
-          <td><button class="edit-btn">Edit</button></td>
-        </tr>
-        <tr>
-          <td>2</td><td>Sandeep</td><td>sandeep@example.com</td>
-          <td><!-- <img src="/placeholder-signature.png" alt="Signature" /> --></td>
+        <tr v-for="(employee, index) in enrol.list">
+          <td>{{ index++ }}</td>
+          <td>{{employee.name}}</td>
+          <td>{{employee.email}}</td>
           <td><button class="edit-btn">Edit</button></td>
         </tr>
       </tbody>
@@ -36,8 +35,26 @@
 <script setup>
 import { ref } from 'vue'
 import Add_Signature from '../../modal/add-signature.vue'
+import api from '~~/api.config'
+import CONFIG from '~~/config'
 
 const show = ref(false)
+
+const enrol = reactive({
+  list: [],
+})
+
+const employeeList = async() => {
+  try {
+    const response = await api.get(`${CONFIG.API}/api/employee/employee`);
+    enrol.list = response.data.list;
+    
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+onMounted(employeeList)
 </script>
 
 
