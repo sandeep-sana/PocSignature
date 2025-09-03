@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-4">
+  <div class="max-w-6xl mx-auto px-4 py-4 space-y-6">
     <!-- Select employee + pick a saved signature -->
     <div>
       <label class="block text-sm font-medium">Selected Employee</label>
@@ -29,7 +29,7 @@
       <label class="block text-sm font-medium">Upload PDF (the page with the signature)</label>
       <input type="file" accept="application/pdf" @change="onPdfFile" class="border p-2 rounded w-full" />
 
-      <div class="flex items-center gap-3 text-sm opacity-80">
+      <div class="flex items-center flex-wrap gap-3 text-sm opacity-80">
         <span>Zoom: {{ (scale * 100).toFixed(0) }}%</span>
         <input type="range" min="50" max="200" v-model.number="zoomUi" @input="applyZoomFromUi" />
         <button class="border px-2 py-1 rounded" :disabled="!pdfReady" @click="fitToWidth">Fit width</button>
@@ -37,70 +37,85 @@
       </div>
 
       <!-- PDF stage with separate overlay canvas -->
-      <div class="relative overflow-auto border rounded p-2" style="max-height: 70vh;">
-        <!-- Base PDF canvas -->
-        <canvas ref="pdfCanvas" class="block mx-auto" />
-        <!-- Transparent overlay for selection -->
+      <div class="relative overflow-auto border rounded p-2" style="max-height:70vh;">
+        <!-- Base PDF canvas (CSS-scaled to width) -->
+        <canvas ref="pdfCanvas" class="block mx-auto" style="width:100%;height:auto;" />
+        <!-- Transparent overlay for selection (size/pos synced in JS) -->
         <canvas
           ref="overlayCanvas"
-          class="absolute"
-          style="inset: 0; margin: auto; touch-action: none; pointer-events: auto; z-index: 10; cursor: crosshair;"
+          class="absolute pointer-events-auto"
+          style="inset:0;margin:auto;touch-action:none;z-index:10;cursor:crosshair;"
         />
       </div>
 
       <div class="flex flex-wrap gap-2">
         <button class="border px-3 py-2 rounded" :disabled="!hasCrop" @click="clearCrop">Clear selection</button>
-        <!-- Optional manual apply; auto-apply already happens on release -->
         <button class="border px-3 py-2 rounded" :disabled="!hasCrop" @click="applyCropFromSelection">Apply crop</button>
       </div>
-      <p class="text-xs opacity-70">Drag on the overlay to select the signature. The cropped preview appears immediately.</p>
+      <p class="text-xs opacity-70">Drag on the overlay to select the signature. Release (auto-apply) or click “Apply crop”.</p>
     </div>
 
-    <!-- Preview: selected DB signature & cropped PDF signature (shows FIRST) -->
+    <!-- Raw previews -->
     <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <h3 class="text-sm font-medium mb-2">Cropped PDF Signature (Preview)</h3>
+        <h3 class="text-sm font-medium mb-2">Employee Signature (Reference)</h3>
         <div class="border rounded p-2 min-h-28 flex items-center justify-center checker">
-          <!-- force <img> refresh by key -->
-          <img v-if="pdfCropDataUrl" :src="pdfCropDataUrl" :key="pdfCropDataUrl" class="max-h-40 object-contain" />
+          <img v-if="sigDataUrl" :src="sigDataUrl" style="max-height:12rem;width:100%;object-fit:contain;" />
+          <span v-else class="text-xs opacity-60">No signature selected.</span>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-sm font-medium mb-2">PDF Cropped Signature</h3>
+        <div class="border rounded p-2 min-h-28 flex items-center justify-center checker">
+          <img v-if="pdfCropDataUrl" :src="pdfCropDataUrl" :key="pdfCropDataUrl" style="max-height:12rem;width:100%;object-fit:contain;" />
           <span v-else class="text-xs opacity-60">No crop yet. Draw a box on the PDF.</span>
         </div>
       </div>
+    </div>
 
+    <!-- Aligned inputs (normalized) — fixed size via inline style -->
+    <div v-if="alignedAUrl || alignedBUrl" class="grid md:grid-cols-2 gap-4">
       <div>
-        <h3 class="text-sm font-medium mb-2">Selected Employee Signature</h3>
-        <div class="border rounded p-2 min-h-28 flex items-center justify-center checker">
-          <img v-if="sigDataUrl" :src="sigDataUrl" class="max-h-40 object-contain" />
-          <span v-else class="text-xs opacity-60">No signature selected.</span>
+        <h3 class="text-sm font-medium mb-2">Aligned Employee (normalized)</h3>
+        <div class="border rounded p-2 flex items-center justify-center checker"
+             :style="canonicalBoxStyle">
+          <img v-if="alignedAUrl" :src="alignedAUrl" :key="alignedAUrl"
+               style="width:100%;height:100%;object-fit:contain;image-rendering:pixelated;" />
+          <span v-else class="text-xs opacity-60">—</span>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-sm font-medium mb-2">Aligned PDF Crop (normalized)</h3>
+        <div class="border rounded p-2 flex items-center justify-center checker"
+             :style="canonicalBoxStyle">
+          <img v-if="alignedBUrl" :src="alignedBUrl" :key="alignedBUrl"
+               style="width:100%;height:100%;object-fit:contain;image-rendering:pixelated;" />
+          <span v-else class="text-xs opacity-60">—</span>
         </div>
       </div>
     </div>
 
     <!-- Compare -->
     <div class="flex items-center gap-3">
-      <button
-        class="border px-3 py-2 rounded"
-        :disabled="!sigDataUrl || !pdfCropDataUrl"
-        @click="compareNow"
-      >
-        Compare Signatures
+      <button class="border px-3 py-2 rounded" :disabled="!sigDataUrl || !pdfCropDataUrl" @click="compareNow">
+        Align & Compare (position-invariant)
       </button>
       <div class="text-sm opacity-80">
         <span class="mr-2">Blur: {{ BLUR_PX }}px</span>
-        <span>Threshold: {{ thresholdMode }}</span>
+        <span class="mr-2">Threshold: {{ thresholdMode }}</span>
+        <span>Shift search: ±{{ MAX_SHIFT }}px</span>
       </div>
     </div>
 
     <!-- Result + Diff -->
     <div v-if="result" class="grid md:grid-cols-2 gap-4">
-      <div class="border rounded p-3">
-        <p class="mb-2"><strong>Match:</strong> {{ result.matchPercent.toFixed(2) }}%</p>
-        <p class="text-xs opacity-70">
-          Diff pixels: {{ result.diffPixels }} / {{ result.totalPixels }}
-        </p>
+      <div class="border rounded p-3 text-sm">
+        <p class="mb-2"><strong>Match (Jaccard):</strong> {{ result.matchPercent.toFixed(2) }}%</p>
+        <p class="opacity-80">Intersection: {{ result.intersection }} | Union: {{ result.union }}</p>
+        <p class="opacity-80">Best shift: dx={{ result.dx }}, dy={{ result.dy }}</p>
       </div>
       <div class="border rounded p-3">
-        <p class="text-sm font-medium mb-2">Diff Preview</p>
+        <p class="text-sm font-medium mb-2">Diff Preview (green=overlap, red=only employee, blue=only PDF)</p>
         <canvas ref="diffCanvas" class="border max-w-full"></canvas>
       </div>
     </div>
@@ -108,7 +123,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import api from '~~/api.config'
 import CONFIG from '~~/config'
 
@@ -140,15 +155,27 @@ const hasCrop = ref(false)
 // Cropped image from PDF
 const pdfCropDataUrl = ref('')
 
+// Aligned previews (normalized)
+const alignedAUrl = ref('')
+const alignedBUrl = ref('')
+
 // Compare result + diff
 const result = ref(null)
 const diffCanvas = ref(null)
 
-// Tunables
-const CANONICAL_W = 600
-const CANONICAL_H = 200
+// Tunables (+ used for inline size)
+const CANONICAL_W = 360
+const CANONICAL_H = 120
 const BLUR_PX = 1
 const thresholdMode = 'adaptive'
+const MAX_SHIFT = 20 // px
+
+// Inline style for canonical boxes (so no CSS dependency)
+const canonicalBoxStyle = computed(() => ({
+  width: CANONICAL_W + 'px',
+  height: CANONICAL_H + 'px',
+  maxWidth: '100%'
+}))
 
 // ---------- API ----------
 const employeeList = async () => {
@@ -193,7 +220,6 @@ const onPdfFile = async (e) => {
   pdfReady.value = true
 }
 
-// workerSrc as URL string
 const ensurePdfJs = async () => {
   if (pdfjsLib) return
   const [{ default: workerSrc }, pdfMod] = await Promise.all([
@@ -209,30 +235,35 @@ const renderPage = async (pageNumber) => {
   const viewport = page.getViewport({ scale: scale.value })
   const canvas = pdfCanvas.value; if (!canvas) return
   const ctx = canvas.getContext('2d'); pdfCtx.value = ctx
-  canvas.width = viewport.width; canvas.height = viewport.height
+  canvas.width = viewport.width
+  canvas.height = viewport.height
 
-  // reset crop/result
   hasCrop.value = false; isDragging.value = false
   cropStart.x = cropStart.y = 0; cropEnd.x = cropEnd.y = 0
   pdfCropDataUrl.value = ''; result.value = null
+  alignedAUrl.value = ''; alignedBUrl.value = ''
 
   await page.render({ canvasContext: ctx, viewport }).promise
   await nextTick()
+  syncOverlayCssSize()
+}
 
-  // ---- overlay sync ----
+const syncOverlayCssSize = () => {
+  const base = pdfCanvas.value
   const o = overlayCanvas.value
-  o.width = canvas.width
-  o.height = canvas.height
+  if (!base || !o) return
 
-  // match CSS size to base canvas rect (prevents DPI/CSS mismatch)
-  const rect = canvas.getBoundingClientRect()
+  // intrinsic pixels
+  o.width = base.width
+  o.height = base.height
+
+  // match CSS box (base is width:100%; height:auto)
+  const rect = base.getBoundingClientRect()
   o.style.width = rect.width + 'px'
   o.style.height = rect.height + 'px'
-
-  // position overlay exactly on top of base within the scroller
   o.style.position = 'absolute'
-  o.style.left = canvas.offsetLeft + 'px'
-  o.style.top = canvas.offsetTop + 'px'
+  o.style.left = base.offsetLeft + 'px'
+  o.style.top = base.offsetTop + 'px'
   o.style.zIndex = '10'
   o.style.cursor = 'crosshair'
 
@@ -240,6 +271,8 @@ const renderPage = async (pageNumber) => {
   wireOverlayPointer()
   drawOverlay()
 }
+
+const handleResize = () => syncOverlayCssSize()
 
 // ---------- overlay pointer events ----------
 const wireOverlayPointer = () => {
@@ -268,7 +301,6 @@ const wireOverlayPointer = () => {
     isDragging.value = false
     hasCrop.value = rectWidth() > 3 && rectHeight() > 3
     drawOverlay()
-    // ✅ Auto-apply crop so the preview shows immediately
     if (hasCrop.value) applyCropFromSelection()
   }
   o.onpointerup = finish
@@ -276,7 +308,6 @@ const wireOverlayPointer = () => {
   o.onpointercancel = finish
 }
 
-// draw translucent mask + rect on overlay
 const drawOverlay = () => {
   const o = overlayCanvas.value; const ctx = overlayCtx.value
   if (!o || !ctx) return
@@ -287,10 +318,10 @@ const drawOverlay = () => {
     const w = rectWidth(); const h = rectHeight()
     ctx.save()
     ctx.fillStyle = 'rgba(0,0,0,0.25)'
-    ctx.fillRect(0, 0, o.width, y)                         // top
-    ctx.fillRect(0, y + h, o.width, o.height - (y + h))    // bottom
-    ctx.fillRect(0, y, x, h)                               // left
-    ctx.fillRect(x + w, y, o.width - (x + w), h)           // right
+    ctx.fillRect(0, 0, o.width, y)
+    ctx.fillRect(0, y + h, o.width, o.height - (y + h))
+    ctx.fillRect(0, y, x, h)
+    ctx.fillRect(x + w, y, o.width - (x + w), h)
     ctx.strokeStyle = '#03a9f4'
     ctx.lineWidth = 2
     ctx.setLineDash([6, 4])
@@ -304,24 +335,18 @@ const clearCrop = () => {
   cropStart.x = cropStart.y = 0
   cropEnd.x = cropEnd.y = 0
   drawOverlay()
-  // keep current preview; comment next line if you want to clear preview too
-  // pdfCropDataUrl.value = ''
 }
 
 const rectWidth = () => Math.abs(cropEnd.x - cropStart.x)
 const rectHeight = () => Math.abs(cropEnd.y - cropStart.y)
 
-// ✅ Used by auto-apply and the "Apply crop" button
 const applyCropFromSelection = () => {
   if (!hasCrop.value) return
   const base = pdfCanvas.value
-
-  // integer + clamped crop box
   let x = Math.min(cropStart.x, cropEnd.x)
   let y = Math.min(cropStart.y, cropEnd.y)
   let w = rectWidth()
   let h = rectHeight()
-
   x = Math.max(0, Math.floor(x))
   y = Math.max(0, Math.floor(y))
   w = Math.max(1, Math.floor(w))
@@ -333,58 +358,30 @@ const applyCropFromSelection = () => {
   tmp.width = w; tmp.height = h
   const tctx = tmp.getContext('2d')
   tctx.drawImage(base, x, y, w, h, 0, 0, w, h)
-
-  // force preview to refresh
   pdfCropDataUrl.value = tmp.toDataURL('image/png')
 }
 
-// ---------- zoom ----------
-const applyZoomFromUi = async () => {
-  if (!pdfDoc) return
-  scale.value = zoomUi.value / 100
-  await renderPage(1)
-}
-const fitToWidth = async () => {
-  if (!pdfDoc) return
-  const page = await pdfDoc.getPage(1)
-  const viewport = page.getViewport({ scale: 1 })
-  const canvas = pdfCanvas.value
-  const targetW = Math.min(viewport.width, (canvas?.parentElement?.clientWidth || viewport.width) - 16)
-  scale.value = targetW / viewport.width
-  zoomUi.value = Math.round(scale.value * 100)
-  await renderPage(1)
-}
-const fitToHeight = async () => {
-  if (!pdfDoc) return
-  const page = await pdfDoc.getPage(1)
-  const viewport = page.getViewport({ scale: 1 })
-  const canvas = pdfCanvas.value
-  const targetH = Math.min(viewport.height, (canvas?.parentElement?.clientHeight || viewport.height) - 16)
-  scale.value = targetH / viewport.height
-  zoomUi.value = Math.round(scale.value * 100)
-  await renderPage(1)
-}
-
-// ---------- compare ----------
+// ---------- compare (position-invariant) ----------
 const compareNow = async () => {
   try {
     result.value = null
+    alignedAUrl.value = ''; alignedBUrl.value = ''
     const [imgA, imgB] = await Promise.all([loadImage(sigDataUrl.value), loadImage(pdfCropDataUrl.value)])
-    const a = drawNormalized(imgA, CANONICAL_W, CANONICAL_H)
-    const b = drawNormalized(imgB, CANONICAL_W, CANONICAL_H)
-    const aData = preprocess(a.getContext('2d'), a.width, a.height, BLUR_PX, thresholdMode)
-    const bData = preprocess(b.getContext('2d'), b.width, b.height, BLUR_PX, thresholdMode)
-    const { diffCount, total, diffImageData } = diffBinary(aData, bData)
-
-    const matchPercent = (1 - diffCount / total) * 100
-    result.value = { matchPercent, diffPixels: diffCount, totalPixels: total }
-
+    const normA = normalizeForCompare(imgA, CANONICAL_H, CANONICAL_W)
+    const normB = normalizeForCompare(imgB, CANONICAL_H, CANONICAL_W)
+    alignedAUrl.value = normA.canvas.toDataURL('image/png')
+    alignedBUrl.value = normB.canvas.toDataURL('image/png')
+    const A = normA.binary, B = normB.binary
+    const W = CANONICAL_W, H = CANONICAL_H
+    const { bestDx, bestDy, bestIntersection, bestUnion } = bestShiftJaccard(A, B, W, H, MAX_SHIFT)
+    const diffImg = buildDiffImage(A, B, W, H, bestDx, bestDy)
+    const match = bestUnion > 0 ? (bestIntersection / bestUnion) * 100 : 0
+    result.value = { matchPercent: match, dx: bestDx, dy: bestDy, intersection: bestIntersection, union: bestUnion }
     await nextTick()
     const dCanvas = diffCanvas.value
     if (!dCanvas) return
-    dCanvas.width = CANONICAL_W
-    dCanvas.height = CANONICAL_H
-    dCanvas.getContext('2d').putImageData(diffImageData, 0, 0)
+    dCanvas.width = W; dCanvas.height = H
+    dCanvas.getContext('2d').putImageData(diffImg, 0, 0)
   } catch (err) {
     console.error('Compare failed:', err)
     result.value = null
@@ -403,74 +400,181 @@ function loadImage (src) {
   })
 }
 
-function drawNormalized (img, W, H) {
-  const c = document.createElement('canvas'); c.width = W; c.height = H
-  const ctx = c.getContext('2d'); ctx.clearRect(0, 0, W, H)
-  const r = Math.min(W / img.width, H / img.height)
-  const dw = Math.max(1, Math.round(img.width * r))
-  const dh = Math.max(1, Math.round(img.height * r))
-  const dx = Math.floor((W - dw) / 2)
-  const dy = Math.floor((H - dh) / 2)
-  ctx.drawImage(img, dx, dy, dw, dh)
-  return c
+function normalizeForCompare (img, targetH, canvasW) {
+  let c = document.createElement('canvas')
+  c.width = Math.max(1, img.width); c.height = Math.max(1, img.height)
+  let ctx = c.getContext('2d')
+  ctx.drawImage(img, 0, 0, c.width, c.height)
+
+  let id = ctx.getImageData(0, 0, c.width, c.height)
+  id = grayscale(id)
+  if (BLUR_PX > 0) id = boxBlur(id, c.width, c.height, BLUR_PX)
+  id = thresholdToBW(id, thresholdMode)
+
+  let bbox = contentBBox(id, c.width, c.height)
+  if (!bbox) {
+    invertImage(id)
+    bbox = contentBBox(id, c.width, c.height)
+    if (!bbox) {
+      const blank = document.createElement('canvas')
+      blank.width = canvasW; blank.height = targetH
+      return { canvas: blank, binary: new Uint8Array(canvasW * targetH) }
+    }
+  }
+  const trimmed = cropImageDataToCanvas(id, c.width, c.height, bbox)
+  const r = Math.min(targetH / trimmed.height, canvasW / trimmed.width)
+  const scaledW = Math.max(1, Math.round(trimmed.width * r))
+  const scaledH = Math.max(1, Math.round(trimmed.height * r))
+  const s = document.createElement('canvas')
+  s.width = scaledW; s.height = scaledH
+  s.getContext('2d').drawImage(trimmed, 0, 0, scaledW, scaledH)
+
+  const out = document.createElement('canvas')
+  out.width = canvasW; out.height = targetH
+  const octx = out.getContext('2d')
+  octx.fillStyle = '#ffffff'
+  octx.fillRect(0, 0, out.width, out.height)
+  const ox = Math.floor((canvasW - scaledW) / 2)
+  const oy = Math.floor((targetH - scaledH) / 2)
+  octx.drawImage(s, ox, oy)
+
+  let outId = octx.getImageData(0, 0, out.width, out.height)
+  outId = thresholdToBW(grayscale(outId), 'fixed', 128)
+  octx.putImageData(outId, 0, 0)
+
+  const bin = new Uint8Array(out.width * out.height)
+  for (let i = 0, p = 0; i < outId.data.length; i += 4, p++) {
+    bin[p] = outId.data[i] === 0 ? 1 : 0
+  }
+  return { canvas: out, binary: bin }
 }
 
-function preprocess (ctx, w, h, blurPx = 1, threshMode = 'adaptive') {
-  let img = ctx.getImageData(0, 0, w, h)
-  const data = img.data
-  for (let i = 0; i < data.length; i += 4) {
-    const y = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2])
-    data[i] = data[i + 1] = data[i + 2] = y
-  }
-  if (blurPx > 0) img = boxBlur(img, w, h, blurPx)
-  let T = 180
-  if (threshMode === 'adaptive') {
-    let sum = 0; for (let i = 0; i < img.data.length; i += 4) sum += img.data[i]
-    T = Math.round(sum / (img.data.length / 4))
-  }
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = img.data[i] > T ? 255 : 0
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255
+function grayscale (img) {
+  const d = img.data
+  for (let i = 0; i < d.length; i += 4) {
+    const y = Math.round(0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2])
+    d[i] = d[i+1] = d[i+2] = y
   }
   return img
 }
-
+function thresholdToBW (img, mode = 'adaptive', fixedT = 180) {
+  const d = img.data
+  let T = fixedT
+  if (mode === 'adaptive') {
+    let sum = 0
+    for (let i = 0; i < d.length; i += 4) sum += d[i]
+    T = Math.round(sum / (d.length / 4))
+  }
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i] > T ? 255 : 0
+    d[i] = d[i+1] = d[i+2] = v
+    d[i+3] = 255
+  }
+  return img
+}
+function invertImage (img) {
+  const d = img.data
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = 255 - d[i]
+    d[i+1] = 255 - d[i+1]
+    d[i+2] = 255 - d[i+2]
+  }
+}
+function contentBBox (img, w, h) {
+  const d = img.data
+  let minX = w, minY = h, maxX = -1, maxY = -1
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4
+      if (d[i] === 0) {
+        if (x < minX) minX = x
+        if (y < minY) minY = y
+        if (x > maxX) maxX = x
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+  if (maxX < 0) return null
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
+}
+function cropImageDataToCanvas (img, w, h, box) {
+  const c = document.createElement('canvas')
+  c.width = box.w; c.height = box.h
+  const ctx = c.getContext('2d')
+  const tmp = new ImageData(box.w, box.h)
+  for (let yy = 0; yy < box.h; yy++) {
+    const srcStart = ((box.y + yy) * w + box.x) * 4
+    const dstStart = (yy * box.w) * 4
+    tmp.data.set(img.data.subarray(srcStart, srcStart + box.w * 4), dstStart)
+  }
+  ctx.putImageData(tmp, 0, 0)
+  return c
+}
 function boxBlur (img, w, h, r) {
   const src = img.data, out = new Uint8ClampedArray(src.length), tmp = new Uint8ClampedArray(src.length), ch = 4
   for (let y = 0; y < h; y++) {
+    let acc = 0
+    for (let k = -r; k <= r; k++) acc += src[(y*w + clamp(k,0,w-1)) * ch]
     for (let x = 0; x < w; x++) {
-      let sum = 0
-      for (let k = -r; k <= r; k++) sum += src[(y * w + clamp(x + k, 0, w - 1)) * ch]
-      const v = Math.round(sum / (2 * r + 1)), i = (y * w + x) * ch
-      tmp[i] = tmp[i + 1] = tmp[i + 2] = v; tmp[i + 3] = 255
+      const i = (y*w + x) * ch
+      tmp[i] = tmp[i+1] = tmp[i+2] = Math.round(acc / (2*r+1))
+      tmp[i+3] = 255
+      const xOut = x - r, xIn = x + r + 1
+      acc += src[(y*w + clamp(xIn,0,w-1)) * ch]
+      acc -= src[(y*w + clamp(xOut,0,w-1)) * ch]
     }
   }
   for (let x = 0; x < w; x++) {
+    let acc = 0
+    for (let k = -r; k <= r; k++) acc += tmp[(clamp(k,0,h-1)*w + x) * ch]
     for (let y = 0; y < h; y++) {
-      let sum = 0
-      for (let k = -r; k <= r; k++) sum += tmp[(clamp(y + k, 0, h - 1) * w + x) * ch]
-      const v = Math.round(sum / (2 * r + 1)), i = (y * w + x) * ch
-      out[i] = out[i + 1] = out[i + 2] = v; out[i + 3] = 255
+      const i = (y*w + x) * ch
+      const v = Math.round(acc / (2*r+1))
+      out[i] = out[i+1] = out[i+2] = v
+      out[i+3] = 255
+      const yOut = y - r, yIn = y + r + 1
+      acc += tmp[(clamp(yIn,0,h-1)*w + x) * ch]
+      acc -= tmp[(clamp(yOut,0,h-1)*w + x) * ch]
     }
   }
   return new ImageData(out, w, h)
 }
-
-function diffBinary (imgA, imgB) {
-  const w = Math.min(imgA.width, imgB.width), h = Math.min(imgA.height, imgB.height)
-  const total = w * h, out = new Uint8ClampedArray(w * h * 4)
-  let diff = 0
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4, a = imgA.data[i], b = imgB.data[i], same = a === b
-      if (!same) diff++
-      if (same) { out[i] = out[i + 1] = out[i + 2] = 220 } else { out[i] = 255; out[i + 1] = 0; out[i + 2] = 0 }
-      out[i + 3] = 255
+function bestShiftJaccard (A, B, W, H, R) {
+  let best = -1, bestDx = 0, bestDy = 0, bestI = 0, bestU = 0
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
+      let inter = 0, uni = 0
+      const xStart = Math.max(0, dx), xEnd = Math.min(W, W + dx)
+      const yStart = Math.max(0, dy), yEnd = Math.min(H, H + dy)
+      for (let y = yStart; y < yEnd; y++) {
+        let iA = y * W + xStart, iB = (y - dy) * W + (xStart - dx)
+        for (let x = xStart; x < xEnd; x++, iA++, iB++) {
+          const a = A[iA], b = B[iB]
+          if (a | b) { uni++; if (a & b) inter++; }
+        }
+      }
+      const score = uni > 0 ? inter / uni : 0
+      if (score > best) { best = score; bestDx = dx; bestDy = dy; bestI = inter; bestU = uni }
     }
   }
-  return { diffCount: diff, total, diffImageData: new ImageData(out, w, h) }
+  return { bestDx, bestDy, bestIntersection: bestI, bestUnion: bestU }
 }
-
+function buildDiffImage (A, B, W, H, dx, dy) {
+  const out = new Uint8ClampedArray(W * H * 4)
+  for (let i = 0; i < out.length; i += 4) { out[i]=230; out[i+1]=230; out[i+2]=230; out[i+3]=255 }
+  const xStart = Math.max(0, dx), xEnd = Math.min(W, W + dx)
+  const yStart = Math.max(0, dy), yEnd = Math.min(H, H + dy)
+  for (let y = yStart; y < yEnd; y++) {
+    let iA = y * W + xStart, iB = (y - dy) * W + (xStart - dx)
+    for (let x = xStart; x < xEnd; x++, iA++, iB++) {
+      const a = A[iA], b = B[iB], o = (y * W + x) * 4
+      if (a && b)      { out[o]=0;   out[o+1]=180; out[o+2]=0   }
+      else if (a)      { out[o]=220; out[o+1]=0;   out[o+2]=0   }
+      else if (b)      { out[o]=0;   out[o+1]=90;  out[o+2]=255 }
+    }
+  }
+  return new ImageData(out, W, H)
+}
 function canvasCoords (canvas, ev) {
   const rect = canvas.getBoundingClientRect()
   const x = (ev.clientX - rect.left) * (canvas.width / rect.width)
@@ -480,13 +584,21 @@ function canvasCoords (canvas, ev) {
 function clamp (v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
 // ---------- lifecycle ----------
-onMounted(employeeList)
+onMounted(() => {
+  employeeList()
+  window.addEventListener('resize', handleResize, { passive: true })
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+})
 watch(selectedEmployeeId, fetchSignatures)
 </script>
 
 <style scoped>
+/* only non-critical cosmetics left here */
+
 .min-h-28 { min-height: 7rem; }
-/* checkerboard background to make crop bounds obvious */
+
 .checker {
   background-image:
     linear-gradient(45deg, #eee 25%, transparent 25%),
