@@ -3,6 +3,8 @@
         <h2>Sidebar</h2>
         <router-link to="/">Dashboard</router-link>
         <router-link to="/enrol">Enrol</router-link>
+        <router-link to="/stamp">Stamp</router-link>
+        <router-link to="/validate-compare">Validate Compare</router-link>
     </aside>
 </template>
 

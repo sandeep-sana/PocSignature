@@ -3,9 +3,9 @@
     <canvas ref="canvas" class="sig-canvas"></canvas>
 
     <div class="controls">
-      <button @click="clear">Clear</button>
-      <button @click="undo">Undo</button>
-      <button @click="savePng">OK</button>
+      <button type="button" @click="clear">Clear</button>
+      <button type="button" @click="undo">Undo</button>
+      <button type="button" @click="savePng">OK</button>
     </div>
   </div>
 </template>

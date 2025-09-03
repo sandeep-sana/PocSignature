@@ -19,14 +19,14 @@
           <td>{{ index++ }}</td>
           <td>{{employee.name}}</td>
           <td>{{employee.email}}</td>
-          <td><button class="edit-btn">Edit</button></td>
+          <td><button class="edit-btn" type="button" @click="edit(employee._id)">Edit</button></td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <!-- Option A: separate close event -->
-  <Add_Signature :show="show" @close="show = false" />
+  <Add_Signature v-if="show" :_id="enrol._id" @close="show = false" />
 
   <!-- Option B: v-model (if you update the child, see below) -->
   <!-- <Add_Signature v-model:show="show" /> -->
@@ -42,6 +42,7 @@ const show = ref(false)
 
 const enrol = reactive({
   list: [],
+  _id: null,
 })
 
 const employeeList = async() => {
@@ -52,6 +53,11 @@ const employeeList = async() => {
   } catch (error) {
     console.log(error);
   }
+}
+
+const edit = (_id) => {
+  show.value = true;
+  enrol._id = _id;
 }
 
 onMounted(employeeList)

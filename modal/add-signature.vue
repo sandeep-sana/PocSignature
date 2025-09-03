@@ -1,6 +1,6 @@
 <!-- components/AddSignatureModal.vue -->
 <template>
-    <div class="sig-backdrop" v-if="show" aria-modal="true" role="dialog" aria-labelledby="sigModalTitle">
+    <div class="sig-backdrop" aria-modal="true" role="dialog" aria-labelledby="sigModalTitle">
         <div class="sig-modal card shadow-lg">
             <!-- Header -->
             <div class="card-header d-flex align-items-center justify-content-between bg-white">
@@ -73,24 +73,8 @@
 
                     <!-- Draw Mode -->
                     <ClientOnly v-if="mode === 'draw'">
-                        <div class="sig-section">
-                            <label class="form-label mb-2">Draw Signature</label>
-
-                            <div class="card border-1 sig-canvas-card">
-                                <div class="card-body p-2">
-                                    <div class="sig-canvas-wrap">
-                                        <canvas ref="canvas" class="sig-canvas w-100 h-100"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="d-flex gap-2 mt-2">
-                                <button type="button" class="btn btn-outline-secondary" @click="clear">
-                                    Clear
-                                </button>
-                                <small class="text-muted align-self-center">Use mouse or touch to draw</small>
-                            </div>
-                        </div>
+                        <ErrorMessage name="signature" class="error-message" />
+                        <SignaturePad :canvas="values.signature" @saved="signature" />
                     </ClientOnly>
 
                     <!-- Upload Mode -->
@@ -111,7 +95,10 @@
                         </div>
                     </div>
 
-                   
+                    <div v-for="s in values.signatures">
+                        {{ s.createdAt }}
+                        <img :src="s.signature" alt="">
+                    </div>
 
                     <!-- Versions -->
                     <div v-if="versions.length" class="mt-4">
@@ -150,7 +137,7 @@ import SignaturePad from "../common/signature-pad.vue";
 import api from "../api.config";
 import CONFIG from "../config";
 
-const props = defineProps({ show: Boolean });
+const props = defineProps({ _id: String });
 const emit = defineEmits(["close", "saved"]);
 
 const { handleSubmit, errors, values, setValues } = useForm({
@@ -173,6 +160,7 @@ const { handleSubmit, errors, values, setValues } = useForm({
 });
 
 const save = handleSubmit(async (values) => {
+    delete values.signatures;
     const response = await api.post(`${CONFIG.API}/api/employee/employee`, { ...values });
     console.log('response', response);
     close();
@@ -229,11 +217,34 @@ function handleResize() {
     }
 }
 
+const fetchEmployee = async () => {
+    try {
+        const response = await api.get(`${CONFIG.API}/api/employee/employeeId`, {
+            params: {
+                _id: props._id,
+            }
+        });
+        console.log(response)
+
+        setValues({
+            ...values,
+            ...response.data.data,
+
+        })
+
+    } catch (error) {
+        console.log(error);
+    }
+}
 onMounted(async () => {
-    if (mode.value === "draw" && props.show) {
+    if (mode.value === "draw") {
         await nextTick();
         setupCanvas();
         window.addEventListener("resize", handleResize);
+    }
+    console.log(props._id)
+    if (props._id) {
+        fetchEmployee();
     }
 });
 
@@ -241,14 +252,14 @@ onBeforeUnmount(() => {
     window.removeEventListener("resize", handleResize);
 });
 
-watch(() => props.show, async (v) => {
-    if (v && mode.value === 'draw') {
-        await nextTick()
-        setupCanvas()
-    }
-});
+// watch(() => props.show, async (v) => {
+//     if (v && mode.value === 'draw') {
+//         await nextTick()
+//         setupCanvas()
+//     }
+// });
 watch(mode, async (m) => {
-    if (props.show && m === "draw") {
+    if (m === "draw") {
         await nextTick();
         setupCanvas();
     }
@@ -270,7 +281,6 @@ async function onSignatureFile(e) {
 
     // Convert file to base64 (data URL)
     const dataUrl = await fileToDataURL(f)
-    // 1) show preview from base64
     signaturePreview.value = dataUrl
     // 2) store base64 into your vee-validate form value
     setValues({
