@@ -44,33 +44,34 @@
         <canvas
           ref="overlayCanvas"
           class="absolute"
-          style="inset: 0; margin: auto; touch-action: none; pointer-events: auto; z-index: 10;"
+          style="inset: 0; margin: auto; touch-action: none; pointer-events: auto; z-index: 10; cursor: crosshair;"
         />
       </div>
 
       <div class="flex flex-wrap gap-2">
         <button class="border px-3 py-2 rounded" :disabled="!hasCrop" @click="clearCrop">Clear selection</button>
-        <button class="border px-3 py-2 rounded" :disabled="!hasCrop" @click="cropFromPdf">Crop from PDF</button>
+        <!-- Optional manual apply; auto-apply already happens on release -->
+        <button class="border px-3 py-2 rounded" :disabled="!hasCrop" @click="applyCropFromSelection">Apply crop</button>
       </div>
-      <p class="text-xs opacity-70">Tip: Drag on the overlay (on top of the PDF) to select the signature region.</p>
+      <p class="text-xs opacity-70">Drag on the overlay to select the signature. The cropped preview appears immediately.</p>
     </div>
 
-    <!-- Preview: selected DB signature & cropped PDF signature -->
+    <!-- Preview: selected DB signature & cropped PDF signature (shows FIRST) -->
     <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <h3 class="text-sm font-medium mb-2">Selected Employee Signature</h3>
-        <div class="border rounded p-2 min-h-28 flex items-center justify-center">
-          <img v-if="sigDataUrl" :src="sigDataUrl" class="max-h-40" />
-          <span v-else class="text-xs opacity-60">No signature selected.</span>
+        <h3 class="text-sm font-medium mb-2">Cropped PDF Signature (Preview)</h3>
+        <div class="border rounded p-2 min-h-28 flex items-center justify-center checker">
+          <!-- force <img> refresh by key -->
+          <img v-if="pdfCropDataUrl" :src="pdfCropDataUrl" :key="pdfCropDataUrl" class="max-h-40 object-contain" />
+          <span v-else class="text-xs opacity-60">No crop yet. Draw a box on the PDF.</span>
         </div>
       </div>
 
       <div>
-        <h3 class="text-sm font-medium mb-2">Cropped PDF Signature</h3>
-        <div class="border rounded p-2 min-h-28 flex items-center justify-center">
-          <!-- force re-render when URL changes -->
-          <img v-if="pdfCropDataUrl" :src="pdfCropDataUrl" :key="pdfCropDataUrl" class="max-h-40" />
-          <span v-else class="text-xs opacity-60">No crop yet.</span>
+        <h3 class="text-sm font-medium mb-2">Selected Employee Signature</h3>
+        <div class="border rounded p-2 min-h-28 flex items-center justify-center checker">
+          <img v-if="sigDataUrl" :src="sigDataUrl" class="max-h-40 object-contain" />
+          <span v-else class="text-xs opacity-60">No signature selected.</span>
         </div>
       </div>
     </div>
@@ -232,6 +233,8 @@ const renderPage = async (pageNumber) => {
   o.style.position = 'absolute'
   o.style.left = canvas.offsetLeft + 'px'
   o.style.top = canvas.offsetTop + 'px'
+  o.style.zIndex = '10'
+  o.style.cursor = 'crosshair'
 
   overlayCtx.value = o.getContext('2d')
   wireOverlayPointer()
@@ -263,8 +266,10 @@ const wireOverlayPointer = () => {
   const finish = () => {
     if (!isDragging.value) return
     isDragging.value = false
-    hasCrop.value = rectWidth() > 3 && rectHeight() > 3 // small > 0
+    hasCrop.value = rectWidth() > 3 && rectHeight() > 3
     drawOverlay()
+    // ✅ Auto-apply crop so the preview shows immediately
+    if (hasCrop.value) applyCropFromSelection()
   }
   o.onpointerup = finish
   o.onpointerleave = finish
@@ -299,12 +304,15 @@ const clearCrop = () => {
   cropStart.x = cropStart.y = 0
   cropEnd.x = cropEnd.y = 0
   drawOverlay()
+  // keep current preview; comment next line if you want to clear preview too
+  // pdfCropDataUrl.value = ''
 }
 
 const rectWidth = () => Math.abs(cropEnd.x - cropStart.x)
 const rectHeight = () => Math.abs(cropEnd.y - cropStart.y)
 
-const cropFromPdf = () => {
+// ✅ Used by auto-apply and the "Apply crop" button
+const applyCropFromSelection = () => {
   if (!hasCrop.value) return
   const base = pdfCanvas.value
 
@@ -326,7 +334,7 @@ const cropFromPdf = () => {
   const tctx = tmp.getContext('2d')
   tctx.drawImage(base, x, y, w, h, 0, 0, w, h)
 
-  // set data URL (force refresh by changing key in template)
+  // force preview to refresh
   pdfCropDataUrl.value = tmp.toDataURL('image/png')
 }
 
@@ -478,4 +486,14 @@ watch(selectedEmployeeId, fetchSignatures)
 
 <style scoped>
 .min-h-28 { min-height: 7rem; }
+/* checkerboard background to make crop bounds obvious */
+.checker {
+  background-image:
+    linear-gradient(45deg, #eee 25%, transparent 25%),
+    linear-gradient(-45deg, #eee 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #eee 75%),
+    linear-gradient(-45deg, transparent 75%, #eee 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
 </style>
