@@ -58,7 +58,7 @@
                     <!-- Mode Switch -->
                     <div class="d-flex flex-wrap align-items-center gap-2 my-4">
                         <div class="btn-group sig-segment" role="group" aria-label="Signature mode switch">
-                            <button type="button" class="btn"
+                            <button type="button" class="btn me-2"
                                 :class="mode === 'draw' ? 'btn-primary' : 'btn-outline-primary'" @click="mode = 'draw'">
                                 Draw
                             </button>
@@ -388,7 +388,7 @@ function fileToDataURL(file) {
 .btn-outline-primary:hover,
 .btn-outline-primary:focus {
     border-color: var(--sig-primary);
-    background-color: var(--sig-primary);
+    background-color: #0a1aaf
 }
 
 .btn-outline-primary {
