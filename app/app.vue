@@ -1,9 +1,9 @@
 <template>
-  <div class="layout">
-    <!-- Sidebar fixed on the left -->
+  <div v-if="isLoginPage" class="layout login-layout">
+    <NuxtPage />
+  </div>
+  <div v-else class="layout">
     <Sidebar />
-
-    <!-- Main content area -->
     <div class="content">
       <NuxtLayout>
         <NuxtPage />
@@ -14,6 +14,9 @@
 
 <script setup>
 import Sidebar from '../common/Sidebar.vue'
+
+const route = useRoute()
+const isLoginPage = computed(() => route.path === '/login')
 </script>
 
 <style scoped>
@@ -28,5 +31,9 @@ import Sidebar from '../common/Sidebar.vue'
   flex: 1;
   padding: 1rem;
   margin-left: 220px; /* same as Sidebar width */
+}
+
+.login-layout {
+  margin-left: 0;
 }
 </style>

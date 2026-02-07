@@ -1,9 +1,18 @@
 <template>
-  <div class="container-lg py-4">
-    <!-- 1) Employee & Saved Signatures -->
+  <div class="validate-compare-page">
+    <div class="page-header">
+      <span class="demo-badge">Compare</span>
+      <div class="header-text">
+        <h1>Validate & Compare</h1>
+        <p class="compliance-line">Compare specimen signature with signature on PDF — position-invariant alignment, Jaccard/Dice/SSIM.</p>
+      </div>
+    </div>
+
+    <div class="container-lg py-3">
+    <!-- Step 1: Employee & Reference Signature -->
     <section class="card section-card mb-4">
       <div class="card-header d-flex align-items-center justify-content-between py-2">
-        <h2 class="h6 mb-0">Select Employee & Reference Signature</h2>
+        <h2 class="h6 mb-0"><span class="step-num">1</span> Select Employee & Reference Signature</h2>
         <span class="badge rounded-pill"
           :class="validateCompare.signatures?.length ? 'text-bg-success' : 'text-bg-secondary'">
           {{ validateCompare.signatures?.length || 0 }} saved
@@ -45,10 +54,10 @@
       </div>
     </section>
 
-    <!-- 2) PDF Upload & Tools -->
+    <!-- Step 2: PDF Upload & Mark Area -->
     <section class="card section-card mb-4">
       <div class="card-header d-flex align-items-center justify-content-between py-2">
-        <h2 class="h6 mb-0">Upload PDF & Mark Signature Area</h2>
+        <h2 class="h6 mb-0"><span class="step-num">2</span> Upload PDF & Mark Signature Area</h2>
         <span class="badge rounded-pill" :class="pdfReady ? 'text-bg-success' : 'text-bg-secondary'">
           {{ pdfReady ? 'PDF Ready' : 'No PDF loaded' }}
         </span>
@@ -81,8 +90,6 @@
         </div>
 
         <!-- PDF stage -->
-        <!-- PDF stage (aligned canvases) -->
-        <!-- PDF stage (aligned canvases) -->
         <div class="pdf-stage position-relative overflow-auto border rounded-3 mt-3 p-2" ref="pdfStage">
           <div class="canvas-wrap position-relative d-inline-block mx-auto" ref="canvasWrap">
             <!-- Base PDF canvas -->
@@ -106,12 +113,12 @@
       </div>
     </section>
 
-    <!-- 3) Raw Previews -->
+    <!-- Step 3: Raw Previews -->
     <section class="row g-4 mb-4">
       <div class="col-md-6">
         <div class="card section-card h-100">
           <div class="card-header py-2">
-            <h3 class="h6 mb-0">Employee Signature (Reference)</h3>
+            <h3 class="h6 mb-0"><span class="step-num small">3a</span> Employee Signature (Reference)</h3>
           </div>
           <div class="card-body">
             <div class="checker border rounded-3 d-flex align-items-center justify-content-center min-h-180 p-2">
@@ -126,7 +133,7 @@
       <div class="col-md-6">
         <div class="card section-card h-100">
           <div class="card-header py-2">
-            <h3 class="h6 mb-0">PDF Cropped Signature</h3>
+            <h3 class="h6 mb-0"><span class="step-num small">3b</span> PDF Cropped Signature</h3>
           </div>
           <div class="card-body">
             <div class="checker border rounded-3 d-flex align-items-center justify-content-center min-h-180 p-2">
@@ -174,77 +181,87 @@
       </div>
     </section>
 
-    <!-- 5) Compare -->
-    <section class="d-flex flex-wrap align-items-center gap-2 mb-4">
-      <button class="btn btn-primary" :disabled="!sigDataUrl || !pdfCropDataUrl" @click="compareNow">
-        Align &amp; Compare (position-invariant)
-      </button>
-
-      <div class="d-flex flex-wrap align-items-center gap-2 small text-muted">
-        <span class="badge rounded-pill text-bg-light border">Blur: {{ BLUR_PX }}px</span>
-        <span class="badge rounded-pill text-bg-light border">Threshold: {{ thresholdMode }}</span>
-        <span class="badge rounded-pill text-bg-light border">Shift search: ±{{ MAX_SHIFT }}px</span>
+    <!-- Step 4: Compare -->
+    <section class="compare-actions card section-card mb-4">
+      <div class="card-body d-flex flex-wrap align-items-center gap-3">
+        <button class="btn btn-primary btn-lg" :disabled="!sigDataUrl || !pdfCropDataUrl" @click="compareNow">
+          Align &amp; Compare
+        </button>
+        <p class="mb-0 small text-muted">Normalizes both images, finds best alignment, then compares (Dice + SSIM).</p>
+        <div class="d-flex flex-wrap align-items-center gap-2 small text-muted ms-auto">
+          <span class="badge rounded-pill text-bg-light border">Blur: {{ BLUR_PX }}px</span>
+          <span class="badge rounded-pill text-bg-light border">Threshold: {{ thresholdMode }}</span>
+          <span class="badge rounded-pill text-bg-light border">Shift: ±{{ MAX_SHIFT }}px</span>
+        </div>
       </div>
     </section>
 
-    <!-- 6) Result + Diff -->
-    <section v-if="result" class="row g-4">
-      <div class="col-md-6">
-        <div class="card section-card h-100">
-          <div class="card-body">
-            <div class="d-flex align-items-center justify-content-between">
-              <p class="mb-0 fw-semibold">Match (Jaccard)</p>
-              <span class="badge fs-6" :class="result.matchPercent >= 50 ? 'bg-success' : 'bg-danger'">
-                {{ result.matchPercent.toFixed(2) }}%
-              </span>
-            </div>
-
-            <div class="row g-2 mt-3 small">
-              <div class="col-6">
-                <div class="border rounded-3 p-2">
-                  <div class="text-muted">Intersection</div>
-                  <div class="fw-medium">{{ result.intersection }}</div>
-                </div>
+    <!-- Result + Diff -->
+    <section v-if="result" class="result-section">
+      <h2 class="h5 mb-3">Comparison Result</h2>
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="card section-card result-card">
+            <div class="card-body">
+              <div class="result-verdict d-flex align-items-center gap-3 flex-wrap">
+                <span class="verdict-badge" :class="result.matchPercent >= 50 ? 'pass' : 'fail'">
+                  {{ result.matchPercent >= 50 ? 'Match' : 'No match' }}
+                </span>
+                <span class="match-value" :class="result.matchPercent >= 50 ? 'text-success' : 'text-danger'">
+                  {{ result.matchPercent.toFixed(1) }}%
+                </span>
               </div>
-              <div class="col-6">
-                <div class="border rounded-3 p-2">
-                  <div class="text-muted">Union</div>
-                  <div class="fw-medium">{{ result.union }}</div>
+              <p class="small text-muted mt-2 mb-0">
+                Score uses Dice (overlap) and SSIM (structure). ≥50% typically indicates same signer.
+              </p>
+              <div class="row g-2 mt-3 small">
+                <div class="col-6">
+                  <div class="metric-box">
+                    <span class="text-muted">Dice</span>
+                    <strong>{{ result.dicePercent != null ? result.dicePercent.toFixed(1) : '—' }}%</strong>
+                  </div>
                 </div>
-              </div>
-              <div class="col-6">
-                <div class="border rounded-3 p-2">
-                  <div class="text-muted">Best shift dx</div>
-                  <div class="fw-medium">{{ result.dx }}</div>
+                <div class="col-6">
+                  <div class="metric-box">
+                    <span class="text-muted">SSIM</span>
+                    <strong>{{ result.ssimPercent != null ? result.ssimPercent.toFixed(1) : '—' }}%</strong>
+                  </div>
                 </div>
-              </div>
-              <div class="col-6">
-                <div class="border rounded-3 p-2">
-                  <div class="text-muted">Best shift dy</div>
-                  <div class="fw-medium">{{ result.dy }}</div>
+                <div class="col-6">
+                  <div class="metric-box">
+                    <span class="text-muted">Best shift</span>
+                    <strong>({{ result.dx }}, {{ result.dy }}) px</strong>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="metric-box">
+                    <span class="text-muted">Overlap</span>
+                    <strong>{{ result.intersection }} / {{ result.union }}</strong>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="col-md-6">
-        <div class="card section-card h-100">
-          <div class="card-body">
-            <p class="fw-semibold mb-2">Diff Preview</p>
-            <p class="text-muted small mb-3">
-              <span class="me-2">Green = overlap</span>
-              <span class="me-2">Red = only employee</span>
-              <span>Blue = only PDF</span>
-            </p>
-            <div class="border rounded-3 overflow-auto p-2">
-              <canvas ref="diffCanvas" class="d-block w-100" style="max-width:100%;"></canvas>
+        <div class="col-lg-7">
+          <div class="card section-card h-100">
+            <div class="card-body">
+              <p class="fw-semibold mb-2">Diff Preview</p>
+              <div class="diff-legend d-flex flex-wrap gap-3 small text-muted mb-2">
+                <span><span class="legend-dot overlap"></span> Overlap (both)</span>
+                <span><span class="legend-dot ref-only"></span> Reference only</span>
+                <span><span class="legend-dot pdf-only"></span> PDF only</span>
+              </div>
+              <div class="diff-wrap border rounded-3 overflow-hidden bg-light">
+                <canvas ref="diffCanvas" class="diff-canvas"></canvas>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
+    </div>
   </div>
 </template>
 
@@ -634,6 +651,11 @@ const compareNow = async () => {
     const ctx = dCanvas.getContext('2d');
     if (!ctx) return;
     ctx.putImageData(diffImg, 0, 0);
+    // Scale display for visibility (keep aspect)
+    dCanvas.style.width = '100%';
+    dCanvas.style.maxWidth = '480px';
+    dCanvas.style.height = 'auto';
+    dCanvas.style.display = 'block';
   } catch (err) {
     console.error('Compare failed:', err);
     result.value = null;
@@ -1078,12 +1100,80 @@ watch(selectedEmployeeId, fetchSignatures)
 </script>
 
 <style scoped>
-/* only non-critical cosmetics left here */
-
-.min-h-28 {
-  min-height: 7rem;
+.validate-compare-page { padding-bottom: 2rem; }
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0 0.5rem;
 }
+.demo-badge {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  background: #6366f1;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.header-text { flex: 1; min-width: 0; }
+.page-header h1 { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0 0 0.25rem 0; }
+.compliance-line { color: #64748b; font-size: 0.9rem; margin: 0; }
 
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: #e0e7ff;
+  color: #4338ca;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.75rem;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+.step-num.small { width: 1.25rem; height: 1.25rem; font-size: 0.65rem; }
+
+.compare-actions .btn-lg { min-width: 180px; }
+
+.result-section { margin-top: 0.5rem; }
+.result-card .result-verdict { margin-bottom: 0; }
+.verdict-badge {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+.verdict-badge.pass { background: #dcfce7; color: #166534; }
+.verdict-badge.fail { background: #fee2e2; color: #991b1b; }
+.match-value { font-size: 1.5rem; font-weight: 700; }
+.metric-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+}
+.metric-box strong { display: block; margin-top: 0.15rem; }
+
+.diff-legend { display: flex; flex-wrap: wrap; gap: 1rem; }
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+.legend-dot.overlap { background: #16a34a; }
+.legend-dot.ref-only { background: #dc2626; }
+.legend-dot.pdf-only { background: #2563eb; }
+.diff-wrap { padding: 0.5rem; display: flex; justify-content: center; align-items: center; min-height: 140px; }
+.diff-canvas { border-radius: 4px; }
+
+.min-h-28 { min-height: 7rem; }
 .section-card {
   border: 1px solid #e9ecef;
   border-radius: 1rem;

@@ -8,7 +8,7 @@
           <div class="card-header d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-2">
               <span class="fw-semibold">Stamp PDF</span>
-              <span class="badge bg-light text-muted fw-normal">v1.0</span>
+              <span class="badge bg-light text-muted fw-normal">Date/time on stamp</span>
             </div>
             <div class="btn-group btn-group-sm" role="group" aria-label="Sample PDFs">
               <button type="button" class="btn btn-outline-secondary" @click="loadPdfFromAsset(HR_Approval_form)">
@@ -179,7 +179,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import HR_Approval_form from '../../pdf/HR_Approval_Form.pdf'
 import Quality_Log from '../../pdf/Quality_Log.pdf'
 import api from '~~/api.config'
@@ -301,6 +301,18 @@ async function embedFromDataUrl(pdfDoc, dataUrl) {
     : pdfDoc.embedJpg(bytes)
 }
 
+/** Draw date/time text below the signature image (PDF coords: origin bottom-left). */
+function drawStampDateTime(page, x, y, w, h, font, dateTimeStr) {
+  const fontSize = 8
+  const textY = y - h - 4
+  page.drawText(dateTimeStr, {
+    x,
+    y: textY,
+    size: fontSize,
+    font,
+  })
+}
+
 // stamp ONE (from sigDataUrl or selected radio)
 async function stampSingleAndPreview() {
   if (!pdfBytes.value) return
@@ -314,14 +326,15 @@ async function stampSingleAndPreview() {
   isStamping.value = true
   try {
     const pdfDoc = await PDFDocument.load(pdfBytes.value)
+    const font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica)
     const image = await embedFromDataUrl(pdfDoc, dataUrl)
     const pages = pdfDoc.getPages()
     const last = pages[pages.length - 1]
+    const { x, y, w, h } = coords.value
+    const dateTimeStr = new Date().toLocaleString()
 
-    last.drawImage(image, {
-      x: coords.value.x, y: coords.value.y,
-      width: coords.value.w, height: coords.value.h
-    })
+    last.drawImage(image, { x, y, width: w, height: h })
+    drawStampDateTime(last, x, y, w, h, font, dateTimeStr)
 
     const outBytes = await pdfDoc.save()
     const blob = new Blob([outBytes], { type: 'application/pdf' })
@@ -339,6 +352,7 @@ async function stampManyAndPreview() {
   isStamping.value = true
   try {
     const pdfDoc = await PDFDocument.load(pdfBytes.value)
+    const font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica)
     const pages = pdfDoc.getPages()
     const last = pages[pages.length - 1]
     const pageW = last.getWidth()
@@ -348,8 +362,9 @@ async function stampManyAndPreview() {
     const startY = coords.value.y
     const w = coords.value.w
     const h = coords.value.h
-    const GAP = 10
+    const GAP = 14
     const MARGIN = 10
+    const dateTimeStr = new Date().toLocaleString()
 
     let x = startX
     let y = startY
@@ -362,8 +377,9 @@ async function stampManyAndPreview() {
 
       const image = await embedFromDataUrl(pdfDoc, dataUrl)
       last.drawImage(image, { x, y, width: w, height: h })
+      drawStampDateTime(last, x, y, w, h, font, dateTimeStr)
 
-      // advance row (upwards in PDF coords)
+      // advance row (upwards in PDF coords: leave room for date text below sig)
       y += h + GAP
 
       // wrap to next column if exceeding page height
